@@ -244,6 +244,8 @@ export function SortingVisualizer() {
                       comparing={comparing}
                       swapping={swapping}
                       sorted={sorted}
+                      products={products}
+                      sortField={sortField}
                     />
                     
                     {/* Legenda */}

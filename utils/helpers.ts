@@ -37,3 +37,16 @@ export function getFieldLabel(field: SortField): string {
   };
   return labels[field];
 }
+
+export function formatValue(value: number, field: SortField): string {
+  if (field === 'price') {
+    if (value >= 1000) {
+      return `R$${(value / 1000).toFixed(1)}K`;
+    }
+    return `R$${value.toFixed(0)}`;
+  }
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(1)}K`;
+  }
+  return value.toFixed(0);
+}

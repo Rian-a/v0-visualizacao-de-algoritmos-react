@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { algorithms, algorithmInfos, AlgorithmName } from '@/algorithms';
 import { formatTime } from '@/utils/helpers';
 import { Button } from '@/components/ui/button';
@@ -22,71 +22,157 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { Play, Loader2 } from 'lucide-react';
+import { Play, Loader2, CheckCircle2 } from 'lucide-react';
 
-interface ComparisonResult {
+interface AlgorithmState {
   algorithm: AlgorithmName;
   name: string;
   comparisons: number;
   swaps: number;
   time: number;
   complexity: string;
+  status: 'idle' | 'running' | 'finished';
+  progress: number;
+  totalSteps: number;
 }
 
 interface PerformanceComparisonProps {
   originalArray: number[];
+  speed?: number;
 }
 
 const algorithmOrder: AlgorithmName[] = ['bubble', 'selection', 'insertion', 'merge', 'quick', 'heap'];
 
-export function PerformanceComparison({ originalArray }: PerformanceComparisonProps) {
-  const [results, setResults] = useState<ComparisonResult[]>([]);
+export function PerformanceComparison({ originalArray, speed = 100 }: PerformanceComparisonProps) {
+  const [algorithmStates, setAlgorithmStates] = useState<AlgorithmState[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const abortRef = useRef(false);
 
   const runComparison = useCallback(async () => {
     if (originalArray.length === 0) return;
 
+    abortRef.current = false;
     setIsRunning(true);
-    setResults([]);
 
-    const newResults: ComparisonResult[] = [];
+    // Inicializar estados para todos os algoritmos
+    const initialStates: AlgorithmState[] = algorithmOrder.map((alg) => ({
+      algorithm: alg,
+      name: algorithmInfos[alg].name,
+      comparisons: 0,
+      swaps: 0,
+      time: 0,
+      complexity: algorithmInfos[alg].averageCase,
+      status: 'running',
+      progress: 0,
+      totalSteps: 0,
+    }));
+    setAlgorithmStates(initialStates);
 
-    for (const alg of algorithmOrder) {
+    // Pré-calcular os steps de cada algoritmo
+    const algorithmData = algorithmOrder.map((alg) => {
       const arrayCopy = [...originalArray];
-      const info = algorithmInfos[alg];
-      
       const startTime = performance.now();
       const result = algorithms[alg](arrayCopy);
       const endTime = performance.now();
-
-      newResults.push({
+      return {
         algorithm: alg,
-        name: info.name,
-        comparisons: result.comparisons,
-        swaps: result.swaps,
-        time: endTime - startTime,
-        complexity: info.averageCase,
-      });
+        steps: result.steps,
+        totalComparisons: result.comparisons,
+        totalSwaps: result.swaps,
+        totalTime: endTime - startTime,
+      };
+    });
 
-      // Pequeno delay para atualização visual
-      setResults([...newResults]);
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
+    // Atualizar totalSteps
+    setAlgorithmStates((prev) =>
+      prev.map((state, i) => ({
+        ...state,
+        totalSteps: algorithmData[i].steps.length,
+      }))
+    );
+
+    // Executar todos os algoritmos simultaneamente
+    const runAlgorithm = async (index: number) => {
+      const data = algorithmData[index];
+      const totalSteps = data.steps.length;
+      const startTime = performance.now();
+
+      let comparisons = 0;
+      let swaps = 0;
+
+      for (let stepIndex = 0; stepIndex < totalSteps; stepIndex++) {
+        if (abortRef.current) return;
+
+        const step = data.steps[stepIndex];
+        
+        // Contar comparações e trocas incrementalmente
+        if (step.comparing.length > 0) {
+          comparisons++;
+        }
+        if (step.swapping.length > 0) {
+          swaps++;
+        }
+
+        const currentTime = performance.now() - startTime;
+        const progress = Math.round(((stepIndex + 1) / totalSteps) * 100);
+
+        setAlgorithmStates((prev) =>
+          prev.map((state, i) =>
+            i === index
+              ? {
+                  ...state,
+                  comparisons,
+                  swaps,
+                  time: currentTime,
+                  progress,
+                  status: stepIndex === totalSteps - 1 ? 'finished' : 'running',
+                }
+              : state
+          )
+        );
+
+        // Delay controlado pela velocidade (mais rápido para comparação)
+        const delay = Math.max(1, Math.floor(speed / 10));
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+
+      // Atualizar com valores finais reais
+      const finalTime = performance.now() - startTime;
+      setAlgorithmStates((prev) =>
+        prev.map((state, i) =>
+          i === index
+            ? {
+                ...state,
+                comparisons: data.totalComparisons,
+                swaps: data.totalSwaps,
+                time: finalTime,
+                progress: 100,
+                status: 'finished',
+              }
+            : state
+        )
+      );
+    };
+
+    // Executar todos os algoritmos em paralelo
+    await Promise.all(algorithmOrder.map((_, index) => runAlgorithm(index)));
 
     setIsRunning(false);
-  }, [originalArray]);
+  }, [originalArray, speed]);
 
-  const chartData = results.map((r) => ({
-    name: r.name.replace(' Sort', ''),
-    Comparações: r.comparisons,
-    Trocas: r.swaps,
-    'Tempo (ms)': Math.round(r.time * 100) / 100,
+  const chartData = algorithmStates.map((state) => ({
+    name: state.name.replace(' Sort', ''),
+    Comparações: state.comparisons,
+    Trocas: state.swaps,
+    'Tempo (ms)': Math.round(state.time * 100) / 100,
   }));
 
-  // Encontrar o mais rápido
-  const fastest = results.length > 0 
-    ? results.reduce((a, b) => a.time < b.time ? a : b)
-    : null;
+  // Encontrar o mais rápido (apenas entre os finalizados)
+  const finishedAlgorithms = algorithmStates.filter((s) => s.status === 'finished');
+  const fastest =
+    finishedAlgorithms.length > 0
+      ? finishedAlgorithms.reduce((a, b) => (a.time < b.time ? a : b))
+      : null;
 
   return (
     <div className="space-y-6">
@@ -116,9 +202,9 @@ export function PerformanceComparison({ originalArray }: PerformanceComparisonPr
         </p>
       )}
 
-      {results.length > 0 && (
+      {algorithmStates.length > 0 && (
         <>
-          {/* Tabela comparativa */}
+          {/* Tabela comparativa com atualização em tempo real */}
           <div className="rounded-lg border overflow-hidden">
             <Table>
               <TableHeader>
@@ -127,32 +213,66 @@ export function PerformanceComparison({ originalArray }: PerformanceComparisonPr
                   <TableHead className="text-right">Comparações</TableHead>
                   <TableHead className="text-right">Trocas</TableHead>
                   <TableHead className="text-right">Tempo</TableHead>
-                  <TableHead className="text-right">Complexidade</TableHead>
+                  <TableHead className="text-right">Progresso</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {results.map((result) => (
+                {algorithmStates.map((state) => (
                   <TableRow
-                    key={result.algorithm}
-                    className={fastest?.algorithm === result.algorithm ? 'bg-green-500/10' : ''}
+                    key={state.algorithm}
+                    className={`transition-colors duration-200 ${
+                      state.status === 'running'
+                        ? 'bg-blue-500/10'
+                        : fastest?.algorithm === state.algorithm && state.status === 'finished'
+                        ? 'bg-green-500/10'
+                        : ''
+                    }`}
                   >
                     <TableCell className="font-medium">
-                      {result.name}
-                      {fastest?.algorithm === result.algorithm && (
-                        <span className="ml-2 text-xs text-green-500">★ Mais rápido</span>
+                      {state.name}
+                      {fastest?.algorithm === state.algorithm && state.status === 'finished' && (
+                        <span className="ml-2 text-xs text-green-500">Mais rápido</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {result.comparisons.toLocaleString()}
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {state.comparisons.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {result.swaps.toLocaleString()}
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {state.swaps.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatTime(result.time)}
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {formatTime(state.time)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-muted-foreground">
-                      {result.complexity}
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-100 ${
+                              state.status === 'finished' ? 'bg-green-500' : 'bg-blue-500'
+                            }`}
+                            style={{ width: `${state.progress}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-muted-foreground w-8 text-right">
+                          {state.progress}%
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {state.status === 'running' ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-blue-500">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Executando
+                        </span>
+                      ) : state.status === 'finished' ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-green-500">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Finalizado
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Aguardando</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -160,21 +280,18 @@ export function PerformanceComparison({ originalArray }: PerformanceComparisonPr
             </Table>
           </div>
 
-          {/* Gráfico de barras */}
+          {/* Gráfico de barras com atualização em tempo real */}
           <div className="p-4 bg-card rounded-lg border">
             <h4 className="text-sm font-semibold mb-4">Gráfico Comparativo</h4>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                <XAxis 
-                  dataKey="name" 
+                <XAxis
+                  dataKey="name"
                   tick={{ fontSize: 12 }}
                   stroke="hsl(var(--muted-foreground))"
                 />
-                <YAxis 
-                  tick={{ fontSize: 12 }}
-                  stroke="hsl(var(--muted-foreground))"
-                />
+                <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
@@ -189,21 +306,18 @@ export function PerformanceComparison({ originalArray }: PerformanceComparisonPr
             </ResponsiveContainer>
           </div>
 
-          {/* Gráfico de tempo */}
+          {/* Gráfico de tempo com atualização em tempo real */}
           <div className="p-4 bg-card rounded-lg border">
             <h4 className="text-sm font-semibold mb-4">Tempo de Execução (ms)</h4>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                <XAxis 
-                  dataKey="name" 
+                <XAxis
+                  dataKey="name"
                   tick={{ fontSize: 12 }}
                   stroke="hsl(var(--muted-foreground))"
                 />
-                <YAxis 
-                  tick={{ fontSize: 12 }}
-                  stroke="hsl(var(--muted-foreground))"
-                />
+                <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: 'hsl(var(--card))',

@@ -325,7 +325,7 @@ export function SortingVisualizer() {
           <TabsContent value="comparison">
             <Card>
               <CardContent className="pt-6">
-                <PerformanceComparison originalArray={originalValues} />
+                <PerformanceComparison originalArray={originalValues} speed={speed} />
               </CardContent>
             </Card>
           </TabsContent>

@@ -16,12 +16,13 @@ import { AlgorithmSelector } from './AlgorithmSelector';
 import { FieldSelector } from './FieldSelector';
 import { DatasetSize } from './DatasetSize';
 import { PerformanceComparison } from './PerformanceComparison';
+import { SearchSection } from './SearchSection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { RefreshCw, Loader2, Database, BarChart3 } from 'lucide-react';
+import { RefreshCw, Loader2, Database, BarChart3, Search } from 'lucide-react';
 
 export function SortingVisualizer() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -140,7 +141,7 @@ export function SortingVisualizer() {
         </header>
 
         <Tabs defaultValue="visualizer" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+          <TabsList className="grid w-full grid-cols-3 max-w-lg mx-auto">
             <TabsTrigger value="visualizer" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               Visualizador
@@ -148,6 +149,10 @@ export function SortingVisualizer() {
             <TabsTrigger value="comparison" className="gap-2">
               <Database className="h-4 w-4" />
               Comparação
+            </TabsTrigger>
+            <TabsTrigger value="search" className="gap-2">
+              <Search className="h-4 w-4" />
+              Busca
             </TabsTrigger>
           </TabsList>
 
@@ -328,6 +333,10 @@ export function SortingVisualizer() {
                 <PerformanceComparison originalArray={originalValues} speed={speed} />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="search">
+            <SearchSection products={products} />
           </TabsContent>
         </Tabs>
 

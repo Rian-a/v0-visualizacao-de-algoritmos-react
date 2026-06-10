@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Product } from '@/algorithms/types';
 import {
   SearchAlgorithmName,
@@ -51,6 +51,9 @@ export function SearchSection({ products }: SearchSectionProps) {
   // Resultados da comparação entre buscas
   const [linearResult, setLinearResult] = useState<{ comparisons: number; time: number } | null>(null);
   const [binaryResult, setBinaryResult] = useState<{ comparisons: number; time: number } | null>(null);
+
+  // Referência para rolar até a seção de comparação ao comparar
+  const comparisonRef = useRef<HTMLDivElement>(null);
 
   const {
     currentIndex,
@@ -122,6 +125,11 @@ export function SearchSection({ products }: SearchSectionProps) {
     } else {
       setBinaryResult(null);
     }
+
+    // Rola até a seção de comparação para que o resultado fique visível
+    requestAnimationFrame(() => {
+      comparisonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   }, [query, products, field, mode]);
 
   // Busca binária não suporta busca parcial por substring
@@ -395,7 +403,7 @@ export function SearchSection({ products }: SearchSectionProps) {
       </div>
 
       {/* Comparação de buscas */}
-      <Card>
+      <Card ref={comparisonRef} className="scroll-mt-4">
         <CardContent className="pt-6">
           <SearchComparison
             linearComparisons={linearResult?.comparisons ?? null}

@@ -13,12 +13,20 @@ function matches(
   query: string,
   mode: SearchMode
 ): boolean {
-  if (field === 'title') {
-    const title = normalizeText(product.title);
+  // Busca parcial: substring case-insensitive sobre a representação textual
+  // de QUALQUER campo (textual ou numérico). Ex.: "note" encontra "Notebook Dell".
+  if (mode === 'partial') {
+    const fieldText = normalizeText(product[field]);
     const q = normalizeText(query);
-    return mode === 'exact' ? title === q : title.includes(q);
+    return q.length > 0 && fieldText.includes(q);
   }
-  // Campos numéricos: comparação exata sempre
+
+  // Busca exata em campo textual: comparação de strings normalizadas
+  if (field === 'title') {
+    return normalizeText(product.title) === normalizeText(query);
+  }
+
+  // Busca exata em campos numéricos
   const fieldValue = product[field];
   const numericQuery = parseFloat(query);
   if (isNaN(numericQuery)) return false;

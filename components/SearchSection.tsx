@@ -18,6 +18,7 @@ import { formatTime } from '@/utils/helpers';
 import { SearchVisualizer } from './SearchVisualizer';
 import { SearchInfoPanel } from './SearchInfoPanel';
 import { SearchComparison } from './SearchComparison';
+import { SearchScalability } from './SearchScalability';
 import { Controls } from './Controls';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -230,7 +231,7 @@ export function SearchSection({ products }: SearchSectionProps) {
             <p className="text-xs text-muted-foreground mt-1">
               {mode === 'exact'
                 ? 'Retorna apenas correspondências exatas.'
-                : 'Retorna qualquer item que contenha o texto informado (apenas no campo Título).'}
+                : 'Retorna qualquer item cujo valor contenha o texto informado (substring, ignorando maiúsculas/minúsculas).'}
             </p>
           </div>
 
@@ -414,6 +415,9 @@ export function SearchSection({ products }: SearchSectionProps) {
           />
         </CardContent>
       </Card>
+
+      {/* Escalabilidade dos algoritmos de busca */}
+      <SearchScalability />
     </div>
   );
 }

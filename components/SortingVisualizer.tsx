@@ -17,12 +17,13 @@ import { FieldSelector } from './FieldSelector';
 import { DatasetSize } from './DatasetSize';
 import { PerformanceComparison } from './PerformanceComparison';
 import { SearchSection } from './SearchSection';
+import { PersistenceSection } from './PersistenceSection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { RefreshCw, Loader2, Database, BarChart3, Search } from 'lucide-react';
+import { RefreshCw, Loader2, Database, BarChart3, Search, HardDrive } from 'lucide-react';
 
 export function SortingVisualizer() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -122,6 +123,17 @@ export function SortingVisualizer() {
     setHeapSteps([]);
   }, [reset, products, sortField]);
 
+  // Seção 9 — dados carregados pela aba Persistência atualizam o dataset global
+  // e passam a ser reutilizados por Visualizador, Comparação e Busca.
+  const handlePersistedDataLoaded = useCallback((loaded: Product[]) => {
+    setProducts(loaded);
+    const values = extractValues(loaded, sortField);
+    setOriginalValues(values);
+    setError(null);
+    reset();
+    setHeapSteps([]);
+  }, [sortField, reset]);
+
   const currentHeapStep = heapSteps[currentStep] || { heapSize: 0, heapifying: [] };
   const normalizedValues = normalizeValues(currentArray.length > 0 ? currentArray : originalValues);
   const displayValues = currentArray.length > 0 ? currentArray : originalValues;
@@ -141,7 +153,7 @@ export function SortingVisualizer() {
         </header>
 
         <Tabs defaultValue="visualizer" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-lg mx-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 max-w-2xl mx-auto">
             <TabsTrigger value="visualizer" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               Visualizador
@@ -153,6 +165,10 @@ export function SortingVisualizer() {
             <TabsTrigger value="search" className="gap-2">
               <Search className="h-4 w-4" />
               Busca
+            </TabsTrigger>
+            <TabsTrigger value="persistence" className="gap-2">
+              <HardDrive className="h-4 w-4" />
+              Persistência
             </TabsTrigger>
           </TabsList>
 
@@ -337,6 +353,13 @@ export function SortingVisualizer() {
 
           <TabsContent value="search">
             <SearchSection products={products} />
+          </TabsContent>
+
+          <TabsContent value="persistence">
+            <PersistenceSection
+              products={products}
+              onDataLoaded={handlePersistedDataLoaded}
+            />
           </TabsContent>
         </Tabs>
 
